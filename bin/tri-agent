@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""
+tri-agent: Command-line orchestration CLI for Antigravity, Claude Code, and Codex.
+"""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+# Add parent directory to sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from lib.agents import get_all_agents
+from lib.orchestrator import (
+    create_handoff_contract,
+    diagnose_environment,
+    install_skills_globally,
+    read_handoff_contract,
+)
+
+
+def cmd_doctor(args):
+    print("\n=======================================================")
+    print(" 🛸 Tri-Agent Orchestrator: Environment Doctor")
+    print("=======================================================\n")
+    
+    report = diagnose_environment()
+    
+    print("Coding Agents Status:")
+    for key, data in report["agents"].items():
+        symbol = "✅" if data["ready"] else "❌"
+        status_str = f"{symbol} {data['name']} ({key})"
+        print(f"  {status_str:<35} : {data['version']}")
+        if data["path"]:
+            print(f"    └─ Path: {data['path']}")
+    
+    print("\nDeveloper Utilities:")
+    for tool, data in report["tools"].items():
+        symbol = "✅" if data["ready"] else "⚠️ "
+        print(f"  {symbol} {tool:<15} : {data['path'] or 'Not found'}")
+        
+    print("\nStatus Summary:")
+    if report["all_agents_ready"]:
+        print("  🎉 All 3 agent CLIs (Antigravity, Claude Code, Codex) are active and ready!\n")
+    else:
+        print("  ⚠️  One or more agent CLIs are missing. You can still run partial handoffs.\n")
+
+
+def cmd_install_skill(args):
+    print("\n📦 Registering 'tri-agent-orchestrator' skill across environments...")
+    installed = install_skills_globally(verbose=True)
+    print(f"\n🎉 Successfully linked skill in {len(installed)} agent directories!\n")
+
+
+def cmd_handoff(args):
+    if args.action == "status":
+        content = read_handoff_contract()
+        if content:
+            print("\n--- Current HANDOFF.md ---\n")
+            print(content)
+        else:
+            print("\n❌ No active HANDOFF.md found in current directory.\n")
+    elif args.action == "create":
+        feature = args.feature or "new-feature"
+        completed = args.completed or "agy"
+        next_agent = args.next or "claude"
+        phase = args.phase or "Phase 1: Architecture & Specification"
+        
+        path = create_handoff_contract(
+            feature_name=feature,
+            completed_by=completed,
+            next_agent=next_agent,
+            current_phase=phase,
+            summary_done=[f"Initialized architecture and design requirements for {feature}"],
+            artifacts=[f"docs/tri-agent/SPEC-{feature}.md"],
+            constraints=["Strict TypeScript types", "Zero regressions"],
+            checklist=[f"Implement {feature} according to specification", "Update HANDOFF.md for Codex verification"]
+        )
+        print(f"\n✅ Created handoff contract at: {path}\n")
+
+
+def cmd_run(args):
+    agents = get_all_agents()
+    print("\n🚀 Initiating Tri-Agent Workflow...")
+    print(f"  Protocol: {args.workflow.upper()}")
+    print(f"  Task:     {args.prompt}\n")
+    
+    if args.dry_run:
+        print("[DRY RUN MODE]")
+        print("Step 1 (Architect): agy -p \"Research and draft specification for: " + args.prompt + "\"")
+        print("Step 2 (Builder):   claude -p \"Implement the solution based on SPEC.md and HANDOFF.md\"")
+        print("Step 3 (Auditor):   codex exec \"Generate test harness, verify build, and stage PR\"")
+        return
+
+    # Phase 1: Antigravity Architect
+    print("▶ Phase 1: Invoking Antigravity (agy) for Architecture & Spec...")
+    prompt_p1 = (
+        f"You are the Chief Architect in a tri-agent workflow (Antigravity × Claude Code × Codex).\n"
+        f"Your task: Research and produce an architectural specification and contract for: '{args.prompt}'.\n"
+        f"Save the specification into docs/tri-agent/SPEC.md and produce HANDOFF.md with next_agent: claude."
+    )
+    code, out = agents["agy"].run_prompt(prompt_p1, non_interactive=True)
+    print(f"  Antigravity finished with exit code {code}.")
+    
+    # Phase 2: Claude Code Builder
+    print("\n▶ Phase 2: Invoking Claude Code (claude) for Implementation...")
+    prompt_p2 = (
+        f"You are the Lead Software Craftsman in a tri-agent workflow.\n"
+        f"Read docs/tri-agent/SPEC.md and HANDOFF.md.\n"
+        f"Implement the production-ready code with clean abstractions. When finished, update HANDOFF.md with next_agent: codex."
+    )
+    code, out = agents["claude"].run_prompt(prompt_p2, non_interactive=True)
+    print(f"  Claude Code finished with exit code {code}.")
+
+    # Phase 3: Codex Tester & PR Engineer
+    print("\n▶ Phase 3: Invoking OpenAI Codex (codex) for Test Harness & Verification...")
+    prompt_p3 = (
+        f"You are the Reliability Engineer in a tri-agent workflow.\n"
+        f"Read HANDOFF.md and recently implemented files.\n"
+        f"Write comprehensive tests, run test suites/linting, verify no regressions, and summarize changes."
+    )
+    code, out = agents["codex"].run_prompt(prompt_p3, non_interactive=True)
+    print(f"  Codex finished with exit code {code}.")
+    print("\n🎉 Tri-Agent Workflow Completed!\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="tri-agent",
+        description="Tri-Agent Orchestrator: Antigravity × Claude Code × Codex"
+    )
+    subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
+    
+    # doctor
+    subparsers.add_parser("doctor", help="Diagnose agent CLIs, versions, and paths")
+    
+    # install-skill
+    subparsers.add_parser("install-skill", help="Install or link the tri-agent skill across all agent environments")
+    
+    # handoff
+    p_handoff = subparsers.add_parser("handoff", help="Manage inter-agent HANDOFF.md contracts")
+    p_handoff.add_argument("action", choices=["status", "create"], help="Action to perform")
+    p_handoff.add_argument("--feature", help="Feature name")
+    p_handoff.add_argument("--completed", help="Completed agent name (agy|claude|codex)")
+    p_handoff.add_argument("--next", help="Next agent name (agy|claude|codex)")
+    p_handoff.add_argument("--phase", help="Current workflow phase")
+    
+    # run
+    p_run = subparsers.add_parser("run", help="Execute an automated tri-agent pipeline")
+    p_run.add_argument("--workflow", default="relay", choices=["relay", "debate", "audit"], help="Workflow type")
+    p_run.add_argument("--prompt", required=True, help="Task description for the agents")
+    p_run.add_argument("--dry-run", action="store_true", help="Print planned commands without executing")
+    
+    args = parser.parse_args()
+    if not args.subcommand:
+        parser.print_help()
+        sys.exit(0)
+        
+    if args.subcommand == "doctor":
+        cmd_doctor(args)
+    elif args.subcommand == "install-skill":
+        cmd_install_skill(args)
+    elif args.subcommand == "handoff":
+        cmd_handoff(args)
+    elif args.subcommand == "run":
+        cmd_run(args)
+
+
+if __name__ == "__main__":
+    main()
