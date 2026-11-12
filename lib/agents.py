@@ -8,6 +8,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 
 DEFAULT_TIMEOUT = 600  # seconds per agent invocation
+ACCESS_MODES = ("read", "edit")
 
 
 class AgentClient:
@@ -36,18 +37,40 @@ class AgentClient:
         except Exception:
             return "Installed"
 
-    def build_command(self, prompt: str, non_interactive: bool = True) -> Optional[List[str]]:
-        """Return the argv used to invoke this agent, or None for an unknown agent."""
+    def build_command(
+        self,
+        prompt: str,
+        non_interactive: bool = True,
+        access: str = "edit",
+    ) -> Optional[List[str]]:
+        """
+        Return the argv used to invoke this agent, or None for an unknown agent.
+
+        ``access`` sets the permission level for headless runs:
+          - "edit": the agent may modify files in the working tree (the default).
+          - "read": the agent is asked to be read-only (used for audit stages).
+
+        Ordering matters for agy: ``--print`` consumes the next argument as the prompt,
+        so every flag must come before it.
+        """
+        if access not in ACCESS_MODES:
+            raise ValueError(f"access must be one of {ACCESS_MODES}, got {access!r}")
+        edit = access == "edit"
+
         if self.binary_name == "agy":
-            flag = "--print" if non_interactive else "--prompt-interactive"
-            return [self.binary_name, flag, prompt]
+            if non_interactive:
+                mode = "accept-edits" if edit else "plan"
+                return [self.binary_name, "--mode", mode, "--print", prompt]
+            return [self.binary_name, "--prompt-interactive", prompt]
         if self.binary_name == "claude":
             if non_interactive:
-                return [self.binary_name, "--print", prompt]
+                mode = "acceptEdits" if edit else "plan"
+                return [self.binary_name, "--permission-mode", mode, "--print", prompt]
             return [self.binary_name, prompt]
         if self.binary_name == "codex":
             if non_interactive:
-                return [self.binary_name, "exec", prompt]
+                sandbox = "workspace-write" if edit else "read-only"
+                return [self.binary_name, "exec", "--sandbox", sandbox, prompt]
             return [self.binary_name, prompt]
         return None
 
@@ -56,6 +79,7 @@ class AgentClient:
         prompt: str,
         non_interactive: bool = True,
         cwd: Optional[str] = None,
+        access: str = "edit",
     ) -> Tuple[int, str]:
         """
         Execute a prompt against the agent CLI.
@@ -64,7 +88,7 @@ class AgentClient:
         if not self.is_available:
             return 1, f"Error: Agent CLI '{self.binary_name}' is not installed or not in PATH."
 
-        cmd = self.build_command(prompt, non_interactive)
+        cmd = self.build_command(prompt, non_interactive, access=access)
         if cmd is None:
             return 1, f"Unknown agent: {self.binary_name}"
 

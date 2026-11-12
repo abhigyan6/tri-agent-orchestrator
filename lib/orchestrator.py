@@ -2,12 +2,14 @@
 Core Orchestrator Logic for Tri-Agent Orchestrator.
 """
 
+import os
 import re
 import shutil
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from .agents import get_all_agents
 from .templates import render_template
@@ -161,3 +163,53 @@ def parse_handoff(text: str) -> Dict[str, Any]:
         for m in _CHECK_RE.finditer(text)
     ]
     return {"metadata": metadata, "checklist": checklist}
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by someone else
+    return True
+
+
+class LockError(RuntimeError):
+    """Raised when another live run already holds the repository lock."""
+
+
+@contextmanager
+def run_lock(path: Path) -> Iterator[None]:
+    """
+    Hold an exclusive lock file for the duration of a run.
+
+    Two concurrent runs in one repository would overwrite each other's HANDOFF.md and
+    artifacts. A lock whose recorded PID is no longer alive is treated as stale and taken over.
+    Raises RuntimeError if another live run holds the lock.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = None
+    for _ in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            try:
+                holder = int(path.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                holder = None
+            if holder is not None and _pid_alive(holder):
+                raise LockError(f"another tri-agent run is active (pid {holder}); lock file: {path}")
+            path.unlink(missing_ok=True)  # stale lock: take over
+    if fd is None:
+        raise LockError(f"could not acquire run lock: {path}")
+
+    try:
+        os.write(fd, str(os.getpid()).encode("ascii"))
+    finally:
+        os.close(fd)
+    try:
+        yield
+    finally:
+        path.unlink(missing_ok=True)

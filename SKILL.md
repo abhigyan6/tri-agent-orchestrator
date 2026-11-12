@@ -66,7 +66,7 @@ Ideal for security-critical logic (authentication, payment processing, file uplo
 
 ## 3. Standard Inter-Agent Handoff Contract (`HANDOFF.md`)
 
-Whenever an agent finishes its phase in a multi-agent workflow, it must write or update `HANDOFF.md` in the workspace root with this exact schema:
+Whenever an agent finishes its phase in a multi-agent workflow, it must write or update `HANDOFF.md` in the workspace root with this exact schema. The `tri-agent run` pipeline checks `Completed By` and `Next Agent` after each phase and stops if they are wrong or unchanged, so a handoff that names the wrong successor halts the run:
 
 ```markdown
 # Tri-Agent Handoff Contract

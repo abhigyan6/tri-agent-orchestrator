@@ -160,9 +160,33 @@ tri-agent run --workflow audit --feature uploads --prompt "Harden the file uploa
 tri-agent run --workflow relay --prompt "Build file upload component" --dry-run
 ```
 
-**Workflow behaviour:** stages run in order, and steps inside a stage run in parallel (the debate's two proposals). If any agent exits non-zero, the pipeline stops before later agents run and prints that agent's output. `tri-agent run` exits non-zero on failure, so it can gate scripts and CI. Each agent call is limited to 600 seconds by default; change it with `--timeout`.
-
 **Requirements:** Python 3.9+ (standard library only, no `pip install` step).
+
+## 🛡️ Safety Model
+
+Every stage is checked before the next agent starts. A run stops at the first violation, and `tri-agent run` exits non-zero so it can gate scripts and CI.
+
+| Check | What it enforces |
+| :--- | :--- |
+| **Artifacts** | Each step's expected files (for example `docs/tri-agent/SPEC-<feature>.md`) exist and are non-empty. |
+| **Handoff** | `HANDOFF.md` was rewritten by this step, with the expected `Completed By` and `Next Agent`. A stale file from an earlier run does not count. |
+| **Write scope** | The read-only-by-intent auditor may only change `docs/tri-agent/` and `HANDOFF.md`. Any other git-visible change stops the run. |
+| **Concurrency** | A lock at `tmp/tri-agent/run.lock` stops a second run in the same repository. A stale lock from a dead process is taken over. |
+| **Audit trail** | Every agent's prompt and output is saved under `tmp/tri-agent/runs/<timestamp>-<feature>/`. |
+
+The write-scope check is **detection, not prevention**. An agent can still edit a forbidden file during its turn. The run then stops and reports the path, but the edit stays in the working tree for you to review or revert.
+
+**Permissions for headless runs.** Each step passes the agent's own permission mode:
+
+| Agent | Edit steps | Command |
+| :--- | :--- | :--- |
+| Claude Code | `--permission-mode acceptEdits` | `--print` |
+| Codex | `--sandbox workspace-write` | `exec` |
+| Antigravity | `--mode accept-edits` | `--print` |
+
+Edits are allowed, but **shell commands are not auto-approved**. Headless Claude Code and Antigravity deny tool calls such as running tests unless you allow them. Antigravity's denial message points to `permissions.allow` in its `settings.json`. Granting that is a security decision for you, so this tool does not do it. Before relying on unattended test runs, do one supervised run per agent and confirm the test step actually executes; this has not been verified end to end.
+
+**Output size.** Each agent call is limited to 600 seconds by default. Change it with `--timeout`.
 
 ---
 
@@ -192,6 +216,8 @@ tri-agent-orchestrator/
 ├── examples/
 │   ├── auth-middleware-walkthrough.md  # Auth middleware walkthrough
 │   └── file-upload-spec-walkthrough.md # File upload walkthrough
+├── .github/workflows/
+│   └── ci.yml                          # Tests on Python 3.9 and 3.12, dry-run smoke test
 ├── tests/
 │   └── test_tri_agent.py               # Unit tests (standard library only)
 └── scripts/
