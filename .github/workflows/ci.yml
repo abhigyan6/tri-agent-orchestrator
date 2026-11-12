@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest no longer provides Python 3.9 through setup-python.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
