@@ -1,5 +1,7 @@
 # Workflow 02: Parallel Architecture Debate & Consensus
 
+> **CLI:** `tri-agent run --workflow debate --prompt "<decision to make>"`
+
 Use this workflow when making critical system design decisions with high architectural impact:
 - Choosing between SQL (PostgreSQL) vs Document (MongoDB) vs Key-Value (DynamoDB).
 - Choosing state management (Zustand vs Redux Toolkit vs Signals).

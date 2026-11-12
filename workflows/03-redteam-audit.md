@@ -1,5 +1,7 @@
 # Workflow 03: Adversarial Red-Team Audit
 
+> **CLI:** `tri-agent run --workflow audit --feature <name> --prompt "<feature to build securely>"`
+
 Use this workflow for security-critical logic, financial calculations, encryption routines, and authorization middlewares.
 
 ```mermaid

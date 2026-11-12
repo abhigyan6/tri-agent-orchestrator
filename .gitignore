@@ -22,3 +22,4 @@ Thumbs.db
 # Tri-agent local runtime artifacts
 HANDOFF.md.bak
 tmp/
+.pytest_cache/

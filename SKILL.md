@@ -66,7 +66,7 @@ Ideal for security-critical logic (authentication, payment processing, file uplo
 
 ## 3. Standard Inter-Agent Handoff Contract (`HANDOFF.md`)
 
-Whenever an agent finishes its phase in a multi-agent workflow, it must write or update `HANDOFF.md` in the workspace root with this exact schema:
+Whenever an agent finishes its phase in a multi-agent workflow, it must write or update `HANDOFF.md` in the workspace root with this exact schema. The `tri-agent run` pipeline checks `Completed By` and `Next Agent` after each phase and stops if they are wrong or unchanged, so a handoff that names the wrong successor halts the run:
 
 ```markdown
 # Tri-Agent Handoff Contract
@@ -106,13 +106,18 @@ When executing from terminal or scripts, use the bundled `tri-agent` CLI tool:
 # Verify all agents are installed and healthy
 tri-agent doctor
 
-# Run an automated relay workflow
+# Run an automated workflow: relay (default), debate, or audit
 tri-agent run --workflow relay --prompt "Build modern auth middleware with JWT rotation"
+tri-agent run --workflow debate --prompt "Choose a session store for the cart"
+tri-agent run --workflow audit --feature uploads --prompt "Harden the file upload endpoint"
+
+# Preview the exact commands without invoking any agent
+tri-agent run --workflow relay --prompt "Build file upload component" --dry-run
 
 # Generate a handoff document
-tri-agent handoff create --agent agy --next claude --feature "auth-middleware"
+tri-agent handoff create --completed agy --next claude --feature "auth-middleware"
 
-# Validate the current workspace handoff state
+# Summarize the current workspace handoff state (add --raw for the full file)
 tri-agent handoff status
 ```
 
