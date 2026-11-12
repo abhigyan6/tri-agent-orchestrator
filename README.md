@@ -90,6 +90,16 @@ Install or symlink the skill so Antigravity, Claude Code, and Codex can use it n
 
 ---
 
+## 🧪 Running the Tests
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The suite uses only the standard library and does not invoke any agent CLI.
+
+---
+
 ## 📋 The Inter-Agent Handoff Contract (`HANDOFF.md`)
 
 Whenever an agent concludes its phase, it produces or updates `HANDOFF.md` in the repository root:
@@ -135,18 +145,24 @@ tri-agent doctor
 # Install the skill to ~/.agents/skills, ~/.claude/skills, and ~/.codex/skills
 tri-agent install-skill
 
-# Check current handoff status in the current project
+# Summarize the handoff in the current project (metadata + checklist progress); --raw prints the full file
 tri-agent handoff status
 
 # Initialize a new handoff contract
 tri-agent handoff create --feature "rate-limiter" --completed agy --next claude
 
-# Run an automated relay workflow
+# Run a workflow: relay (default), debate, or audit
 tri-agent run --workflow relay --prompt "Build modern auth middleware with JWT rotation"
+tri-agent run --workflow debate --prompt "Choose a session store for the cart"
+tri-agent run --workflow audit --feature uploads --prompt "Harden the file upload endpoint"
 
-# Dry run mode (prints planned commands without invoking)
+# Preview the exact commands without invoking any agent
 tri-agent run --workflow relay --prompt "Build file upload component" --dry-run
 ```
+
+**Workflow behaviour:** stages run in order, and steps inside a stage run in parallel (the debate's two proposals). If any agent exits non-zero, the pipeline stops before later agents run and prints that agent's output. `tri-agent run` exits non-zero on failure, so it can gate scripts and CI. Each agent call is limited to 600 seconds by default; change it with `--timeout`.
+
+**Requirements:** Python 3.9+ (standard library only, no `pip install` step).
 
 ---
 
@@ -162,20 +178,24 @@ tri-agent-orchestrator/
 │   └── tri-agent                       # Executable CLI orchestrator
 ├── lib/
 │   ├── agents.py                       # CLI invocation wrappers for agy, claude, codex
-│   ├── orchestrator.py                 # Core workflow coordination & handoff logic
-│   └── templates.py                    # Contract & specification templates
+│   ├── __init__.py
+│   ├── orchestrator.py                 # Handoff contracts, skill installation, environment checks
+│   ├── templates.py                    # Renders templates/ files with {{PLACEHOLDER}} values
+│   └── workflows.py                    # Relay / debate / audit stage planning and execution
 ├── workflows/
 │   ├── 01-relay-pipeline.md            # Research -> Build -> Verify pipeline
 │   ├── 02-parallel-debate.md           # Multi-agent architecture consensus
 │   └── 03-redteam-audit.md             # Implementation & adversarial red-team audit
 ├── templates/
-│   ├── HANDOFF.template.md             # Handoff schema template
+│   ├── HANDOFF.template.md             # Handoff contract (single source of truth)
 │   └── AGENT_SPEC.template.md          # Architectural spec schema template
 ├── examples/
 │   ├── auth-middleware-walkthrough.md  # Auth middleware walkthrough
 │   └── file-upload-spec-walkthrough.md # File upload walkthrough
+├── tests/
+│   └── test_tri_agent.py               # Unit tests (standard library only)
 └── scripts/
-    └── install-skill.sh                # Cross-agent skill installation script
+    └── install-skill.sh                # Cross-agent skill installation (delegates to bin/tri-agent)
 ```
 
 ---

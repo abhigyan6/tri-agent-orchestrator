@@ -1,86 +1,26 @@
 """
-Markdown and Contract Templates for Tri-Agent Orchestration.
+Template rendering for Tri-Agent Orchestrator.
+
+Templates live in the repository's ``templates/`` directory and are the single
+source of truth for the document formats that SKILL.md describes. Placeholders
+use ``{{KEY}}`` syntax and are substituted literally (no str.format), so braces
+inside user-supplied values are safe.
 """
 
-from datetime import datetime
+import re
+from pathlib import Path
+from typing import Dict
 
-HANDOFF_TEMPLATE = """# Tri-Agent Handoff Contract
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+_PLACEHOLDER = re.compile(r"\{\{([A-Z_]+)\}\}")
 
-## Metadata
-- **Workflow ID:** {workflow_id}
-- **Active Feature:** {feature_name}
-- **Current Phase:** {current_phase}
-- **Completed By:** {completed_by}
-- **Next Agent:** {next_agent}
-- **Timestamp:** {timestamp}
 
-## What Was Done
-{summary_done}
-
-## Key Files & Artifacts
-{artifacts}
-
-## Critical Constraints & Architectural Guidelines
-{constraints}
-
-## Verification Checklist for Next Agent
-{checklist}
-"""
-
-SPEC_TEMPLATE = """# Architecture Specification: {feature_name}
-
-**Author (Architect):** Google Antigravity (`agy`)
-**Date:** {date}
-**Status:** Ready for Implementation
-
----
-
-## 1. Executive Summary & Goals
-{summary}
-
-## 2. Architecture & Component Diagram
-```mermaid
-flowchart TD
-    Client --> API_Gateway
-    API_Gateway --> Service
-    Service --> Storage
-```
-
-## 3. Data Models & Interface Contracts
-- API Routes / Types:
-- Invariants & Constraints:
-
-## 4. Implementation Directives for Claude Code (`claude`)
-- File locations:
-- Idiomatic patterns to follow:
-- Error handling policies:
-
-## 5. Reliability & Test Directives for OpenAI Codex (`codex`)
-- Edge cases to cover:
-- Test frameworks to use:
-- Verification commands:
-"""
-
-AUDIT_TEMPLATE = """# Adversarial Security & Quality Audit: {feature_name}
-
-**Auditor:** Google Antigravity (`agy`)
-**Date:** {date}
-**Target Implementation:** {target_files}
-
----
-
-## Findings Matrix
-| ID | Severity | File & Location | Vulnerability / Issue | Recommended Fix |
-| :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | High | ... | ... | ... |
-
-## Attack Vectors Evaluated
-- [ ] Authentication & Authorization Bypass
-- [ ] Injection & Unsanitized Input
-- [ ] Concurrency & Race Conditions
-- [ ] Resource Exhaustion & Denial of Service
-
-## Action Items for Claude Code
-- [ ] Patch SEC-01
-- [ ] Patch SEC-02
-"""
+def render_template(name: str, values: Dict[str, str], templates_dir: Path = TEMPLATES_DIR) -> str:
+    """Load ``templates/<name>`` and substitute every ``{{KEY}}`` from ``values``."""
+    text = (templates_dir / name).read_text(encoding="utf-8")
+    required = set(_PLACEHOLDER.findall(text))
+    missing = sorted(required - set(values))
+    if missing:
+        raise ValueError(f"Template {name} is missing values for: {', '.join(missing)}")
+    # Single pass over the template: values are never re-scanned for placeholders.
+    return _PLACEHOLDER.sub(lambda m: values[m.group(1)], text)

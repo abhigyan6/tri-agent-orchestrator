@@ -8,23 +8,14 @@
 - **Next Agent:** `{{NEXT_AGENT}}`
 - **Timestamp:** `{{TIMESTAMP}}`
 
----
+## What Was Done
+{{SUMMARY_DONE}}
 
-## 1. Summary of Completed Work
-- Detailed summary of changes, analyses, or implementations performed during this phase.
+## Key Files & Artifacts
+{{ARTIFACTS}}
 
-## 2. Key Files & Artifacts
-| Category | File Path | Notes |
-| :--- | :--- | :--- |
-| Specification | `docs/tri-agent/SPEC.md` | Architecture requirements & interface types |
-| Implementation | `src/...` | Core logic authored |
-| Tests | `tests/...` | Verification suites |
+## Critical Constraints & Decisions
+{{CONSTRAINTS}}
 
-## 3. Strict Constraints & Architectural Guidelines
-- Invariants that subsequent agents must not violate.
-- Coding style, types, or performance budgets.
-
-## 4. Verification Checklist for Next Agent
-- [ ] Task 1
-- [ ] Task 2
-- [ ] Run verification command: `<command>`
+## Verification Checklist for Next Agent
+{{CHECKLIST}}
